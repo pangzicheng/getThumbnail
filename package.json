@@ -1,6 +1,6 @@
 {
 	"name": "getthumbnail",
-	"version": "1.0.5",
+	"version": "1.0.6",
 	"description": "get thumbnail ",
 	"main": "./dist/getThumbnail.js",
 	"scripts": {
