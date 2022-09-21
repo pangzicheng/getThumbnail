@@ -2,7 +2,7 @@
  * @Description: 
  * @Author: Cheng
  * @Date: 2022-09-20 13:45:17
- * @LastEditTime: 2022-09-21 14:29:09
+ * @LastEditTime: 2022-09-21 17:21:09
  */
 
 interface thumbnailI {
@@ -70,18 +70,22 @@ const urlToBlob = (urlThumbnailObj: urlThumbnailObjI): Promise<Blob | string> =>
 
 const getBlobObj = (target: HTMLImageElement, width?: number, height?: number, type?: string, rate?: number): Promise<Blob | string> => {
   return new Promise((resolve, reject) => {
+    var image: any = target.cloneNode();
+    image.setAttribute("crossOrigin", "anonymous");
     var canvas: HTMLCanvasElement = document.createElement("canvas");
-    let _rate = rate || 0.5;
-    canvas.width = width || target.width * _rate;
-    canvas.height = height || target.height * _rate;
-    var ctx: any = canvas.getContext("2d");
-    ctx.drawImage(target, 0, 0, canvas.width, canvas.height);
-    var dataURL = canvas.toDataURL("image/png");
-    if (type === 'blob' || !type) {
-      const _blob = base64toBlob(dataURL);
-      resolve(_blob);
-    } else if (type === 'base64') {
-      resolve(dataURL)
+    image.onload = () => {
+      let _rate = rate || 0.5;
+      canvas.width = width || target.width * _rate;
+      canvas.height = height || target.height * _rate;
+      var ctx: any = canvas.getContext("2d");
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      var dataURL = canvas.toDataURL("image/png");
+      if (type === 'blob' || !type) {
+        const _blob = base64toBlob(dataURL);
+        resolve(_blob);
+      } else if (type === 'base64') {
+        resolve(dataURL)
+      }
     }
   });
 }
