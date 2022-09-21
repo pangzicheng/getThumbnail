@@ -3,7 +3,7 @@
  * @Description:
  * @Author: Cheng
  * @Date: 2022-09-20 13:45:17
- * @LastEditTime: 2022-09-21 17:21:09
+ * @LastEditTime: 2022-09-21 18:49:27
  */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -15,13 +15,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.urlToBlob = exports.getThumbnail = void 0;
+exports.getVideoSnap = exports.urlToBlob = exports.getThumbnail = void 0;
+/**
+ * @description: 获取图片dom对象blob 或 base缩略图
+ * @param {thumbnailI} thumbnailObj
+ * @return {*}
+ */
 const getThumbnail = (thumbnailObj) => __awaiter(void 0, void 0, void 0, function* () {
     const { target, width, height, type, rate } = thumbnailObj;
-    if (target) {
-        const _blob = yield getBlobObj(target, width, height, type, rate);
-        return _blob;
-    }
+    const _thumbnailData = yield getBlobObj(target, width, height, type, rate);
+    return _thumbnailData;
 });
 exports.getThumbnail = getThumbnail;
 /**
@@ -33,52 +36,61 @@ const urlToBlob = (urlThumbnailObj) => {
     const { url, type, rate, width, height } = urlThumbnailObj;
     return new Promise((resolve, reject) => {
         let canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const img = new Image;
-        img.crossOrigin = 'Anonymous'; //解决Canvas.toDataURL 图片跨域问题
-        img.onload = () => {
-            // 压缩比例 -- 可以自己修改参数。500px宽度以下原尺寸，大于500px比例处理
-            // let bili = Math.round(width / 500) || 1;
-            const _rate = rate || 0.5;
-            canvas.width = width || img.width * _rate;
-            canvas.height = height || img.height * _rate;
-            // ctx.drawImage(img, 0, 0, width, height, 0, 0, width * rate, height * rate);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            let dataURL = canvas.toDataURL("image/png"); //'image/jpeg'
-            // 去除标头 -- 传递给后台时一般去除头部
-            // let reg = new RegExp('^data:image/[^;]+;base64,');
-            // dataURL = dataURL.replace(reg, '');
-            // resolve(dataURL);
-            if (type === 'blob' || !type) {
-                const _blob = base64toBlob(dataURL);
-                resolve(_blob);
+        const image = new Image;
+        image.crossOrigin = 'Anonymous'; //解决Canvas.toDataURL 图片跨域问题
+        image.onload = () => {
+            try {
+                const _data = imgOnloadTransform(image, canvas, rate, width, height, type);
+                resolve(_data);
             }
-            else if (type === 'base64') {
-                resolve(dataURL);
+            catch (error) {
+                reject(error);
             }
         };
-        img.src = url;
+        image.src = url;
     });
 };
 exports.urlToBlob = urlToBlob;
+/**
+ * @description: 获取视频第一帧图片
+ * @param {videoThumbnailObjI} videoThumbnailObj
+ * @return {*}
+ */
+const getVideoSnap = (videoThumbnailObj) => {
+    const { target, type, width, height } = videoThumbnailObj;
+    let canvas = document.createElement('canvas');
+    return new Promise((resolve, reject) => {
+        try {
+            const _data = imgOnloadTransform(target, canvas, 0, width, height, type);
+            resolve(_data);
+        }
+        catch (error) {
+            reject(error);
+        }
+    });
+};
+exports.getVideoSnap = getVideoSnap;
+/**
+ * @description: 通过base64获取blob对象
+ * @param {HTMLImageElement} target
+ * @param {number} width
+ * @param {number} height
+ * @param {string} type
+ * @param {number} rate
+ * @return {*}
+ */
 const getBlobObj = (target, width, height, type, rate) => {
     return new Promise((resolve, reject) => {
         var image = target.cloneNode();
         image.setAttribute("crossOrigin", "anonymous");
         var canvas = document.createElement("canvas");
         image.onload = () => {
-            let _rate = rate || 0.5;
-            canvas.width = width || target.width * _rate;
-            canvas.height = height || target.height * _rate;
-            var ctx = canvas.getContext("2d");
-            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-            var dataURL = canvas.toDataURL("image/png");
-            if (type === 'blob' || !type) {
-                const _blob = base64toBlob(dataURL);
-                resolve(_blob);
+            try {
+                const _data = imgOnloadTransform(image, canvas, rate, width, height, type);
+                resolve(_data);
             }
-            else if (type === 'base64') {
-                resolve(dataURL);
+            catch (error) {
+                reject(error);
             }
         };
     });
@@ -93,7 +105,7 @@ const base64toBlob = (base64) => {
     let _src = base64; // 拼接最终的base64
     let arr = _src.split(",");
     let array = arr[0].match(/:(.*?);/);
-    let mime = array[1]; //(array && array.length > 1 ? array[1] : type) || type;
+    let mime = (array && array.length > 1 ? array[1] : "image/png") || "image/png";
     let bytes = window.atob(arr[1]);
     let ab = new ArrayBuffer(bytes.length);
     let ia = new Uint8Array(ab);
@@ -102,5 +114,32 @@ const base64toBlob = (base64) => {
     }
     return new Blob([ab], {
         type: mime,
+    });
+};
+/**
+ * @description:
+ * @param {HTMLImageElement | HTMLVideoElement} target
+ * @param {number} rate
+ * @param {HTMLCanvasElement} canvas
+ * @param {number} width
+ * @param {number} height
+ * @param {string} type
+ * @return {*}
+ */
+const imgOnloadTransform = (target, canvas, rate, width, height, type) => {
+    return new Promise((resolve, reject) => {
+        const _rate = rate || 0.5;
+        canvas.width = _rate ? target.width * _rate || 180 : width || 180;
+        canvas.height = _rate ? target.height * _rate || 180 : height || 180;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(target, 0, 0, canvas.width, canvas.height);
+        let dataURL = canvas.toDataURL("image/png");
+        if (type === 'blob' || !type) {
+            const _blob = base64toBlob(dataURL);
+            resolve(_blob);
+        }
+        else if (type === 'base64') {
+            resolve(dataURL);
+        }
     });
 };
